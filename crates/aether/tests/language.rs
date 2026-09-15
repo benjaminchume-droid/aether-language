@@ -13,6 +13,9 @@ use aether::{compiler::compile, lexer, parser, run};
 #[test] fn match_wildcard_executes(){assert_eq!(run("enum Color { Red, Green } let c = Color::Red; match c { Color::Green => { print(\"green\"); }, _ => { print(\"other\"); } }").unwrap(),"other");}
 #[test] fn rejects_non_exhaustive_match(){assert!(compile("enum Color { Red, Green } let c = Color::Red; match c { Color::Red => { print(1); } }").is_err());}
 #[test] fn rejects_unknown_variant(){assert!(compile("enum Color { Red, Green } let c = Color::Red; match c { Color::Blue => { print(1); }, _ => { print(2); } }").is_err());}
+#[test] fn payload_enums_and_pattern_bindings(){assert_eq!(run("enum Message { Quit, Text(String), Count(Int) } let m: Message = Message::Text(\"hello\"); match m { Message::Quit => { print(\"quit\"); }, Message::Text(text) => { print(text); }, Message::Count(n) => { print(n); } }").unwrap(),"hello");}
+#[test] fn rejects_bad_enum_payload(){assert!(compile("enum Message { Text(String) } let m = Message::Text(42);").is_err());}
+#[test] fn rejects_bad_pattern_binding_count(){assert!(compile("enum Message { Text(String) } let m = Message::Text(\"x\"); match m { Message::Text(a, b) => { print(a); }, }").is_err());}
 #[test] fn collections_and_mutation(){assert_eq!(run("let mut xs: Array<Int> = [1, 2, 3]; xs[1] = 9; for x in xs { print(x); }").unwrap(),"1\n9\n3");}
 #[test] fn loop_break_and_continue(){assert_eq!(run("let mut x: Int = 0; loop { x = x + 1; if x == 2 { continue; } if x == 4 { break; } print(x); }").unwrap(),"1\n3");}
 #[test] fn rejects_break_outside_loop(){assert!(run("break;").is_err());}
