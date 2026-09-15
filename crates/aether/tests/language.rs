@@ -1,4 +1,4 @@
-use aether::{compiler::compile, lexer, parser, run};
+use aether::{compiler::{compile,compile_file}, lexer, parser, run, run_file};
 
 #[test] fn lexes_core_syntax(){assert!(lexer::lex("let x: Int = 1 + 2;").unwrap().len()>1);}
 #[test] fn parses_and_runs_arithmetic(){assert_eq!(run("let x: Int = 2 * (3 + 4); print(x);").unwrap(),"14");}
@@ -21,6 +21,9 @@ use aether::{compiler::compile, lexer, parser, run};
 #[test] fn tuple_mutation_executes(){assert_eq!(run("let mut t: Tuple<Int, Int> = (1, 2); t[0] = 9; print(t[0], t[1]);").unwrap(),"9 2");}
 #[test] fn rejects_wrong_tuple_shape(){assert!(compile("let t: Tuple<Int, String> = (1, 2);").is_err());}
 #[test] fn rejects_tuple_out_of_bounds(){assert!(compile("let t = (1, 2); print(t[2]);").is_err());}
+#[test] fn multi_file_import_executes(){assert_eq!(run_file("crates/aether/tests/fixtures/import_main.ae").unwrap(),"42");assert!(compile_file("crates/aether/tests/fixtures/import_main.ae").is_ok());}
+#[test] fn rejects_cyclic_imports(){let err=run_file("crates/aether/tests/fixtures/cycle_a.ae").unwrap_err();assert!(err.contains("cyclic import detected"));}
+#[test] fn direct_run_requires_file_loader_for_imports(){assert!(run("import \"math\"; print(1);").is_err());}
 #[test] fn collections_and_mutation(){assert_eq!(run("let mut xs: Array<Int> = [1, 2, 3]; xs[1] = 9; for x in xs { print(x); }").unwrap(),"1\n9\n3");}
 #[test] fn loop_break_and_continue(){assert_eq!(run("let mut x: Int = 0; loop { x = x + 1; if x == 2 { continue; } if x == 4 { break; } print(x); }").unwrap(),"1\n3");}
 #[test] fn rejects_break_outside_loop(){assert!(run("break;").is_err());}
