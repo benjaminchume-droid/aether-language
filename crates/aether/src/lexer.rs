@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Ident(String), Int(i64), Float(f64), Str(String),
-    Let, Mut, Fn, If, Else, While, For, In, Loop, Break, Continue, Return, True, False,
+    Let, Mut, Fn, Struct, If, Else, While, For, In, Loop, Break, Continue, Return, True, False,
     Plus, Minus, Star, Slash, Percent,
     Eq, EqEq, Bang, BangEq, Lt, Le, Gt, Ge, AndAnd, OrOr,
     LParen, RParen, LBrace, RBrace, LBracket, RBracket,
@@ -29,7 +29,7 @@ pub fn lex(source: &str) -> Result<Vec<Token>, String> {
             '|'=>{if chars.get(i+1)==Some(&'|'){i+=2;col+=2;TokenKind::OrOr}else{return Err(format!("unexpected '|' at {sl}:{sc}"))}},
             '"'=>{i+=1;col+=1;let mut s=String::new();while i<chars.len()&&chars[i]!='"'{if chars[i]=='\\'{i+=1;col+=1;if i>=chars.len(){return Err("unterminated escape".into())}s.push(match chars[i]{'n'=>'\n','r'=>'\r','t'=>'\t','"'=>'"','\\'=>'\\',x=>x})}else{s.push(chars[i])}i+=1;col+=1}if i>=chars.len(){return Err(format!("unterminated string at {sl}:{sc}"))}i+=1;col+=1;TokenKind::Str(s)},
             c if c.is_ascii_digit()=>{let b=i;let mut dot=false;while i<chars.len()&&(chars[i].is_ascii_digit()||(!dot&&chars[i]=='.')){if chars[i]=='.'{dot=true}i+=1;col+=1}let text:String=chars[b..i].iter().collect();if dot{TokenKind::Float(text.parse().map_err(|_|format!("invalid float at {sl}:{sc}"))?)}else{TokenKind::Int(text.parse().map_err(|_|format!("invalid integer at {sl}:{sc}"))?)}},
-            c if c.is_ascii_alphabetic()||c=='_'=>{let b=i;while i<chars.len()&&(chars[i].is_ascii_alphanumeric()||chars[i]=='_'){i+=1;col+=1}match chars[b..i].iter().collect::<String>().as_str(){"let"=>TokenKind::Let,"mut"=>TokenKind::Mut,"fn"=>TokenKind::Fn,"if"=>TokenKind::If,"else"=>TokenKind::Else,"while"=>TokenKind::While,"for"=>TokenKind::For,"in"=>TokenKind::In,"loop"=>TokenKind::Loop,"break"=>TokenKind::Break,"continue"=>TokenKind::Continue,"return"=>TokenKind::Return,"true"=>TokenKind::True,"false"=>TokenKind::False,x=>TokenKind::Ident(x.into())}},
+            c if c.is_ascii_alphabetic()||c=='_'=>{let b=i;while i<chars.len()&&(chars[i].is_ascii_alphanumeric()||chars[i]=='_'){i+=1;col+=1}match chars[b..i].iter().collect::<String>().as_str(){"let"=>TokenKind::Let,"mut"=>TokenKind::Mut,"fn"=>TokenKind::Fn,"struct"=>TokenKind::Struct,"if"=>TokenKind::If,"else"=>TokenKind::Else,"while"=>TokenKind::While,"for"=>TokenKind::For,"in"=>TokenKind::In,"loop"=>TokenKind::Loop,"break"=>TokenKind::Break,"continue"=>TokenKind::Continue,"return"=>TokenKind::Return,"true"=>TokenKind::True,"false"=>TokenKind::False,x=>TokenKind::Ident(x.into())}},
             _=>return Err(format!("unexpected '{c}' at {sl}:{sc}")),
         };out.push(Token{kind,line:sl,column:sc})}
     out.push(Token{kind:TokenKind::Eof,line,column:col});Ok(out)
