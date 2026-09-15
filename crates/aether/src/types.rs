@@ -8,6 +8,7 @@ pub enum Type {
     String,
     Unit,
     Array(Box<Type>),
+    Struct(String),
     Unknown,
 }
 
@@ -42,6 +43,7 @@ impl fmt::Display for Type {
             Self::String => write!(f, "String"),
             Self::Unit => write!(f, "Unit"),
             Self::Array(inner) => write!(f, "Array<{inner}>"),
+            Self::Struct(name) => write!(f, "{name}"),
             Self::Unknown => write!(f, "unknown"),
         }
     }
