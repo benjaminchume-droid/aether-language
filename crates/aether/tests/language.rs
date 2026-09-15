@@ -24,6 +24,28 @@ fn functions_and_return() {
 }
 
 #[test]
+fn collections_and_mutation() {
+    let src = "let mut xs = [1, 2, 3]; xs[1] = 9; for x in xs { print(x); }";
+    assert_eq!(run(src).unwrap(), "1\n9\n3");
+}
+
+#[test]
+fn loop_break_and_continue() {
+    let src = "let mut x = 0; loop { x = x + 1; if x == 2 { continue; } if x == 4 { break; } print(x); }";
+    assert_eq!(run(src).unwrap(), "1\n3");
+}
+
+#[test]
+fn rejects_break_outside_loop() {
+    assert!(run("break;").is_err());
+}
+
+#[test]
+fn rejects_continue_outside_loop() {
+    assert!(run("continue;").is_err());
+}
+
+#[test]
 fn parser_accepts_program() {
     let tokens = lexer::lex("fn main() { print(true); }").unwrap();
     parser::parse(&tokens).unwrap();
