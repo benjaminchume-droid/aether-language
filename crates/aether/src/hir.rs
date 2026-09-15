@@ -17,16 +17,14 @@ pub enum Stmt {
     If { condition: Expr, then_branch: Vec<Stmt>, else_branch: Vec<Stmt> },
     While { condition: Expr, body: Vec<Stmt> },
     For { name: String, iterable: Expr, body: Vec<Stmt> },
+    Loop { body: Vec<Stmt> },
+    Break,
+    Continue,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    Str(String),
-    Array(Vec<Expr>),
-    Ident(String),
+    Int(i64), Float(f64), Bool(bool), Str(String), Array(Vec<Expr>), Ident(String),
     Index { target: Box<Expr>, index: Box<Expr> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     Binary { left: Box<Expr>, op: BinaryOp, right: Box<Expr> },
