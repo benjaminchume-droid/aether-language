@@ -13,6 +13,8 @@ pub enum Item {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expr(Expr),
+    Let { name: String, mutable: bool, value: Expr },
+    Assign { target: Expr, value: Expr },
     Return(Option<Expr>),
     If { condition: Expr, then_branch: Vec<Stmt>, else_branch: Vec<Stmt> },
     While { condition: Expr, body: Vec<Stmt> },
@@ -24,7 +26,9 @@ pub enum Expr {
     Float(f64),
     Bool(bool),
     Str(String),
+    Array(Vec<Expr>),
     Ident(String),
+    Index { target: Box<Expr>, index: Box<Expr> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     Binary { left: Box<Expr>, op: BinaryOp, right: Box<Expr> },
     Call { callee: Box<Expr>, args: Vec<Expr> },
