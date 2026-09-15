@@ -1,7 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program {
-    pub items: Vec<Item>,
-}
+pub struct Program { pub items: Vec<Item> }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
@@ -18,16 +16,12 @@ pub enum Stmt {
     Return(Option<Expr>),
     If { condition: Expr, then_branch: Vec<Stmt>, else_branch: Vec<Stmt> },
     While { condition: Expr, body: Vec<Stmt> },
+    For { name: String, iterable: Expr, body: Vec<Stmt> },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    Str(String),
-    Array(Vec<Expr>),
-    Ident(String),
+    Int(i64), Float(f64), Bool(bool), Str(String), Array(Vec<Expr>), Ident(String),
     Index { target: Box<Expr>, index: Box<Expr> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     Binary { left: Box<Expr>, op: BinaryOp, right: Box<Expr> },
@@ -38,8 +32,4 @@ pub enum Expr {
 pub enum UnaryOp { Neg, Not }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BinaryOp {
-    Add, Sub, Mul, Div, Mod,
-    Eq, Ne, Lt, Le, Gt, Ge,
-    And, Or,
-}
+pub enum BinaryOp { Add, Sub, Mul, Div, Mod, Eq, Ne, Lt, Le, Gt, Ge, And, Or }
