@@ -2,93 +2,20 @@ use crate::ast::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
-enum Value {
-    Int(i64), Float(f64), Bool(bool), Str(String), Array(Vec<Value>), Unit,
+enum Value { Int(i64), Float(f64), Bool(bool), Str(String), Array(Vec<Value>), Unit }
+impl Value { fn truthy(&self)->bool{match self{Value::Bool(v)=>*v,Value::Int(v)=>*v!=0,Value::Float(v)=>*v!=0.0,Value::Str(v)=>!v.is_empty(),Value::Array(v)=>!v.is_empty(),Value::Unit=>false}}}
+enum Flow{Continue,Return(Value)}
+struct Vm{globals:HashMap<String,Value>,functions:HashMap<String,(Vec<String>,Vec<Stmt>)>,output:Vec<String>}
+
+pub fn execute(program:&Program)->Result<String,String>{let mut vm=Vm{globals:HashMap::new(),functions:HashMap::new(),output:Vec::new()};for item in &program.items{match item{Item::Fn{name,params,body}=>{vm.functions.insert(name.clone(),(params.clone(),body.clone()));},Item::Let{name,value,..}=>{let v=vm.eval(value)?;vm.globals.insert(name.clone(),v);},Item::Stmt(s)=>{let mut env=vm.globals.clone();vm.stmt(s,&mut env)?;vm.globals=env;}}}Ok(vm.output.join("\n"))}
+impl Vm{
+ fn eval(&mut self,e:&Expr)->Result<Value,String>{match e{Expr::Int(v)=>Ok(Value::Int(*v)),Expr::Float(v)=>Ok(Value::Float(*v)),Expr::Bool(v)=>Ok(Value::Bool(*v)),Expr::Str(v)=>Ok(Value::Str(v.clone())),Expr::Array(v)=>Ok(Value::Array(v.iter().map(|x|self.eval(x)).collect::<Result<Vec<_>,_>>()?)),Expr::Ident(n)=>self.globals.get(n).cloned().ok_or_else(||format!("undefined variable '{n}'")),Expr::Index{target,index}=>{let b=self.eval(target)?;let i=index_value(self.eval(index)?)?;match b{Value::Array(v)=>v.get(i).cloned().ok_or_else(||format!("index {i} out of bounds")),Value::Str(v)=>v.chars().nth(i).map(|c|Value::Str(c.to_string())).ok_or_else(||format!("index {i} out of bounds")),_=>Err("value is not indexable".into())}},Expr::Unary{op,expr}=>{let v=self.eval(expr)?;match(op,v){(UnaryOp::Neg,Value::Int(x))=>Ok(Value::Int(-x)),(UnaryOp::Neg,Value::Float(x))=>Ok(Value::Float(-x)),(UnaryOp::Not,x)=>Ok(Value::Bool(!x.truthy())),_=>Err("invalid unary operation".into())}},Expr::Binary{left,op,right}=>{let a=self.eval(left)?;if *op==BinaryOp::And&&!a.truthy(){return Ok(Value::Bool(false))}if *op==BinaryOp::Or&&a.truthy(){return Ok(Value::Bool(true))}let b=self.eval(right)?;self.binary(a,*op,b)},Expr::Call{callee,args}=>{let name=match callee.as_ref(){Expr::Ident(n)=>n.clone(),_=>return Err("call target must be a function name".into())};if name=="print"{let vals=args.iter().map(|x|self.eval(x)).collect::<Result<Vec<_>,_>>()?;let s=vals.iter().map(format_value).collect::<Vec<_>>().join(" ");self.output.push(s.clone());return Ok(Value::Unit)}let Some((params,body))=self.functions.get(&name).cloned()else{return Err(format!("undefined function '{name}'"))};if params.len()!=args.len(){return Err(format!("function '{name}' expects {} arguments",params.len()))}let values=args.iter().map(|a|self.eval(a)).collect::<Result<Vec<_>,_>>()?;let mut locals=self.globals.clone();for(p,v)in params.into_iter().zip(values){locals.insert(p,v)}for s in &body{match self.stmt(s,&mut locals)?{Flow::Continue=>{},Flow::Return(v)=>return Ok(v)}}Ok(Value::Unit)}}}
+ fn binary(&self,a:Value,op:BinaryOp,b:Value)->Result<Value,String>{match op{BinaryOp::Add=>match(a,b){(Value::Int(x),Value::Int(y))=>Ok(Value::Int(x+y)),(Value::Float(x),Value::Float(y))=>Ok(Value::Float(x+y)),(Value::Str(x),Value::Str(y))=>Ok(Value::Str(x+y)),(Value::Str(x),y)=>Ok(Value::Str(x+&format_value(&y))),(x,Value::Str(y))=>Ok(Value::Str(format_value(&x)+&y)),(Value::Array(mut x),Value::Array(y))=>{x.extend(y);Ok(Value::Array(x))},_=>Err("invalid + operands".into())},BinaryOp::Sub|BinaryOp::Mul|BinaryOp::Div|BinaryOp::Mod=>num(a,op,b),BinaryOp::Eq=>Ok(Value::Bool(a==b)),BinaryOp::Ne=>Ok(Value::Bool(a!=b)),BinaryOp::Lt|BinaryOp::Le|BinaryOp::Gt|BinaryOp::Ge=>cmp(a,op,b),BinaryOp::And|BinaryOp::Or=>Ok(Value::Bool(a.truthy()&&b.truthy()))}}
+ fn stmt(&mut self,s:&Stmt,env:&mut HashMap<String,Value>)->Result<Flow,String>{match s{Stmt::Expr(e)=>{self.eval_in(e,env)?;Ok(Flow::Continue)},Stmt::Let{name,value,..}=>{let v=self.eval_in(value,env)?;env.insert(name.clone(),v);Ok(Flow::Continue)},Stmt::Assign{target,value}=>{let v=self.eval_in(value,env)?;self.assign(target,v,env)?;Ok(Flow::Continue)},Stmt::Return(e)=>Ok(Flow::Return(match e{Some(x)=>self.eval_in(x,env)?,None=>Value::Unit})),Stmt::If{condition,then_branch,else_branch}=>{let branch=if self.eval_in(condition,env)?.truthy(){then_branch}else{else_branch};for x in branch{if let Flow::Return(v)=self.stmt(x,env)?{return Ok(Flow::Return(v))}}Ok(Flow::Continue)},Stmt::While{condition,body}=>{while self.eval_in(condition,env)?.truthy(){for x in body{if let Flow::Return(v)=self.stmt(x,env)?{return Ok(Flow::Return(v))}}}Ok(Flow::Continue)},Stmt::For{name,iterable,body}=>{let values=self.eval_in(iterable,env)?;match values{Value::Array(items)=>for item in items{env.insert(name.clone(),item);for x in body{if let Flow::Return(v)=self.stmt(x,env)?{return Ok(Flow::Return(v))}}},Value::Str(text)=>for ch in text.chars(){env.insert(name.clone(),Value::Str(ch.to_string()));for x in body{if let Flow::Return(v)=self.stmt(x,env)?{return Ok(Flow::Return(v))}}},_=>return Err("for-in requires an Array or String".into())}Ok(Flow::Continue)}}}
+ fn assign(&mut self,target:&Expr,value:Value,env:&mut HashMap<String,Value>)->Result<(),String>{match target{Expr::Ident(name)=>{if !env.contains_key(name){return Err(format!("undefined variable '{name}'"))}env.insert(name.clone(),value);Ok(())},Expr::Index{target,index}=>{let idx=index_value(self.eval_in(index,env)?)?;match target.as_ref(){Expr::Ident(name)=>{let Some(c)=env.get_mut(name)else{return Err(format!("undefined variable '{name}'"))};match c{Value::Array(v)=>{if idx>=v.len(){return Err(format!("index {idx} out of bounds"))}v[idx]=value;Ok(())},_=>Err("indexed assignment requires an array".into())}},_=>Err("nested indexed assignment requires an addressable base variable".into())}},_=>Err("assignment target is not writable".into())}}
+ fn eval_in(&mut self,e:&Expr,env:&mut HashMap<String,Value>)->Result<Value,String>{let old=std::mem::replace(&mut self.globals,env.clone());let r=self.eval(e);*env=self.globals.clone();self.globals=old;r}
 }
-
-impl Value {
-    fn truthy(&self) -> bool {
-        match self { Value::Bool(v) => *v, Value::Int(v) => *v != 0, Value::Float(v) => *v != 0.0, Value::Str(v) => !v.is_empty(), Value::Array(v) => !v.is_empty(), Value::Unit => false }
-    }
-}
-
-enum Flow { Continue, Return(Value) }
-struct Vm { globals: HashMap<String, Value>, functions: HashMap<String, (Vec<String>, Vec<Stmt>)>, output: Vec<String> }
-
-pub fn execute(program: &Program) -> Result<String, String> {
-    let mut vm = Vm { globals: HashMap::new(), functions: HashMap::new(), output: Vec::new() };
-    for item in &program.items {
-        match item {
-            Item::Fn { name, params, body } => { vm.functions.insert(name.clone(), (params.clone(), body.clone())); }
-            Item::Let { name, value, .. } => { let v = vm.eval(value)?; vm.globals.insert(name.clone(), v); }
-            Item::Stmt(s) => { let mut env = vm.globals.clone(); vm.stmt(s, &mut env)?; vm.globals = env; }
-        }
-    }
-    Ok(vm.output.join("\n"))
-}
-
-impl Vm {
-    fn eval(&mut self, e: &Expr) -> Result<Value, String> {
-        match e {
-            Expr::Int(v) => Ok(Value::Int(*v)), Expr::Float(v) => Ok(Value::Float(*v)), Expr::Bool(v) => Ok(Value::Bool(*v)), Expr::Str(v) => Ok(Value::Str(v.clone())),
-            Expr::Array(values) => Ok(Value::Array(values.iter().map(|x| self.eval(x)).collect::<Result<Vec<_>,_>>()?)),
-            Expr::Ident(n) => self.globals.get(n).cloned().ok_or_else(|| format!("undefined variable '{n}'")),
-            Expr::Index { target, index } => { let base = self.eval(target)?; let idx = self.eval(index)?; let i = index_value(idx)?; match base { Value::Array(v) => v.get(i).cloned().ok_or_else(|| format!("index {i} out of bounds")), Value::Str(v) => v.chars().nth(i).map(|c| Value::Str(c.to_string())).ok_or_else(|| format!("index {i} out of bounds")), _ => Err("value is not indexable".into()) } }
-            Expr::Unary { op, expr } => { let v = self.eval(expr)?; match (op, v) { (UnaryOp::Neg, Value::Int(x)) => Ok(Value::Int(-x)), (UnaryOp::Neg, Value::Float(x)) => Ok(Value::Float(-x)), (UnaryOp::Not, x) => Ok(Value::Bool(!x.truthy())), _ => Err("invalid unary operation".into()) } }
-            Expr::Binary { left, op, right } => { let a = self.eval(left)?; if *op == BinaryOp::And && !a.truthy() { return Ok(Value::Bool(false)); } if *op == BinaryOp::Or && a.truthy() { return Ok(Value::Bool(true)); } let b = self.eval(right)?; self.binary(a, *op, b) }
-            Expr::Call { callee, args } => {
-                let name = match callee.as_ref() { Expr::Ident(n) => n.clone(), _ => return Err("call target must be a function name".into()) };
-                if name == "print" { let vals = args.iter().map(|x| self.eval(x)).collect::<Result<Vec<_>,_>>()?; let s = vals.iter().map(format_value).collect::<Vec<_>>().join(" "); self.output.push(s.clone()); return Ok(Value::Unit); }
-                let Some((params, body)) = self.functions.get(&name).cloned() else { return Err(format!("undefined function '{name}'")); };
-                if params.len() != args.len() { return Err(format!("function '{name}' expects {} arguments", params.len())); }
-                let values = args.iter().map(|a| self.eval(a)).collect::<Result<Vec<_>,_>>()?;
-                let mut locals = self.globals.clone(); for (p, v) in params.into_iter().zip(values) { locals.insert(p, v); }
-                for s in &body { match self.stmt(s, &mut locals)? { Flow::Continue => {}, Flow::Return(v) => return Ok(v) } }
-                Ok(Value::Unit)
-            }
-        }
-    }
-
-    fn binary(&self, a: Value, op: BinaryOp, b: Value) -> Result<Value, String> {
-        match op {
-            BinaryOp::Add => match (a,b) { (Value::Int(x),Value::Int(y))=>Ok(Value::Int(x+y)), (Value::Float(x),Value::Float(y))=>Ok(Value::Float(x+y)), (Value::Str(x),Value::Str(y))=>Ok(Value::Str(x+y)), (Value::Str(x),y)=>Ok(Value::Str(x+&format_value(&y))), (x,Value::Str(y))=>Ok(Value::Str(format_value(&x)+&y)), (Value::Array(mut x),Value::Array(y))=>{x.extend(y);Ok(Value::Array(x))}, _=>Err("invalid + operands".into()) },
-            BinaryOp::Sub|BinaryOp::Mul|BinaryOp::Div|BinaryOp::Mod => num(a,op,b), BinaryOp::Eq => Ok(Value::Bool(a==b)), BinaryOp::Ne => Ok(Value::Bool(a!=b)),
-            BinaryOp::Lt|BinaryOp::Le|BinaryOp::Gt|BinaryOp::Ge => cmp(a,op,b), BinaryOp::And|BinaryOp::Or => Ok(Value::Bool(a.truthy() && b.truthy())),
-        }
-    }
-
-    fn stmt(&mut self, s: &Stmt, env: &mut HashMap<String, Value>) -> Result<Flow, String> {
-        match s {
-            Stmt::Expr(e) => { self.eval_in(e, env)?; Ok(Flow::Continue) }
-            Stmt::Let { name, value, .. } => { let v = self.eval_in(value, env)?; env.insert(name.clone(), v); Ok(Flow::Continue) }
-            Stmt::Assign { target, value } => { let v = self.eval_in(value, env)?; self.assign(target, v, env)?; Ok(Flow::Continue) }
-            Stmt::Return(e) => Ok(Flow::Return(match e { Some(x)=>self.eval_in(x,env)?, None=>Value::Unit })),
-            Stmt::If { condition, then_branch, else_branch } => { let branch = if self.eval_in(condition,env)?.truthy(){then_branch}else{else_branch}; for x in branch { if let Flow::Return(v)=self.stmt(x,env)?{return Ok(Flow::Return(v))} } Ok(Flow::Continue) }
-            Stmt::While { condition, body } => { while self.eval_in(condition,env)?.truthy(){ for x in body { if let Flow::Return(v)=self.stmt(x,env)?{return Ok(Flow::Return(v))} } } Ok(Flow::Continue) }
-        }
-    }
-
-    fn assign(&mut self, target: &Expr, value: Value, env: &mut HashMap<String, Value>) -> Result<(), String> {
-        match target {
-            Expr::Ident(name) => { if !env.contains_key(name) { return Err(format!("undefined variable '{name}'")); } env.insert(name.clone(), value); Ok(()) }
-            Expr::Index { target, index } => {
-                let idx = index_value(self.eval_in(index, env)?)?;
-                match target.as_ref() {
-                    Expr::Ident(name) => {
-                        let Some(container) = env.get_mut(name) else { return Err(format!("undefined variable '{name}'")); };
-                        match container { Value::Array(v) => { if idx >= v.len() { return Err(format!("index {idx} out of bounds")); } v[idx] = value; Ok(()) }, _ => Err("indexed assignment requires an array".into()) }
-                    }
-                    _ => Err("nested indexed assignment requires an addressable base variable".into()),
-                }
-            }
-            _ => Err("assignment target is not writable".into()),
-        }
-    }
-
-    fn eval_in(&mut self, e: &Expr, env: &mut HashMap<String, Value>) -> Result<Value,String> { let old = std::mem::replace(&mut self.globals, env.clone()); let r = self.eval(e); *env = self.globals.clone(); self.globals = old; r }
-}
-
-fn index_value(v: Value) -> Result<usize,String> { match v { Value::Int(i) if i >= 0 => Ok(i as usize), Value::Int(_) => Err("index cannot be negative".into()), _ => Err("index must be Int".into()) } }
+fn index_value(v:Value)->Result<usize,String>{match v{Value::Int(i)if i>=0=>Ok(i as usize),Value::Int(_)=>Err("index cannot be negative".into()),_=>Err("index must be Int".into())}}
 fn format_value(v:&Value)->String{match v{Value::Int(x)=>x.to_string(),Value::Float(x)=>x.to_string(),Value::Bool(x)=>x.to_string(),Value::Str(x)=>x.clone(),Value::Array(xs)=>format!("[{}]",xs.iter().map(format_value).collect::<Vec<_>>().join(", ")),Value::Unit=>"()".into()}}
 fn num(a:Value,op:BinaryOp,b:Value)->Result<Value,String>{match(a,b){(Value::Int(x),Value::Int(y))=>Ok(Value::Int(match op{BinaryOp::Sub=>x-y,BinaryOp::Mul=>x*y,BinaryOp::Div=>x/y,BinaryOp::Mod=>x%y,_=>unreachable!()})),(Value::Float(x),Value::Float(y))=>Ok(Value::Float(match op{BinaryOp::Sub=>x-y,BinaryOp::Mul=>x*y,BinaryOp::Div=>x/y,BinaryOp::Mod=>x%y,_=>unreachable!()})),_=>Err("numeric operands required".into())}}
 fn cmp(a:Value,op:BinaryOp,b:Value)->Result<Value,String>{let r=match(a,b){(Value::Int(x),Value::Int(y))=>match op{BinaryOp::Lt=>x<y,BinaryOp::Le=>x<=y,BinaryOp::Gt=>x>y,BinaryOp::Ge=>x>=y,_=>false},(Value::Float(x),Value::Float(y))=>match op{BinaryOp::Lt=>x<y,BinaryOp::Le=>x<=y,BinaryOp::Gt=>x>y,BinaryOp::Ge=>x>=y,_=>false},_=>return Err("ordered comparison requires matching numeric types".into())};Ok(Value::Bool(r))}
