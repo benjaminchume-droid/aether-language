@@ -4,6 +4,7 @@ pub mod diagnostics;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod prelude;
 pub mod semantic;
 pub mod typecheck;
 pub mod types;
