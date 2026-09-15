@@ -16,6 +16,9 @@ fn item(i: &ast::Item) -> hir::Item {
             return_type: return_type.clone(),
             body: body.iter().map(stmt).collect()
         },
+        ast::Item::Struct { name, fields } => hir::Item::Struct {
+            name: name.clone(), fields: fields.iter().map(|f| hir::Field { name: f.name.clone(), ty: f.ty.clone() }).collect()
+        },
         ast::Item::Stmt(s) => hir::Item::Stmt(stmt(s)),
     }
 }
@@ -47,6 +50,8 @@ fn expr(e: &ast::Expr) -> hir::Expr {
         ast::Expr::Str(v) => hir::Expr::Str(v.clone()),
         ast::Expr::Array(values) => hir::Expr::Array(values.iter().map(expr).collect()),
         ast::Expr::Ident(v) => hir::Expr::Ident(v.clone()),
+        ast::Expr::StructInit { name, fields } => hir::Expr::StructInit { name: name.clone(), fields: fields.iter().map(|(n, v)| (n.clone(), expr(v))).collect() },
+        ast::Expr::Member { target, field } => hir::Expr::Member { target: Box::new(expr(target)), field: field.clone() },
         ast::Expr::Index { target, index } => hir::Expr::Index { target: Box::new(expr(target)), index: Box::new(expr(index)) },
         ast::Expr::Unary { op, expr: inner } => hir::Expr::Unary {
             op: match op { ast::UnaryOp::Neg => hir::UnaryOp::Neg, ast::UnaryOp::Not => hir::UnaryOp::Not }, expr: Box::new(expr(inner))
