@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["crates/aether"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+repository = "https://github.com/benjaminchume-droid/aether-language"
+
+[workspace.dependencies]
+thiserror = "2"
