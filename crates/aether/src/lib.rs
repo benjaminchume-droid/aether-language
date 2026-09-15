@@ -1,8 +1,10 @@
 pub mod ast;
 pub mod compiler;
 pub mod diagnostics;
+pub mod hir;
 pub mod interpreter;
 pub mod lexer;
+pub mod lower;
 pub mod parser;
 pub mod prelude;
 pub mod semantic;
