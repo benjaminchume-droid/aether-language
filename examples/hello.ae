@@ -1,0 +1,6 @@
+fn main() {
+    print("Hello from Aether");
+}
+
+let answer = 40 + 2;
+print(answer);
