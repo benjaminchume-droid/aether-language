@@ -17,6 +17,9 @@ pub enum Stmt {
     If { condition: Expr, then_branch: Vec<Stmt>, else_branch: Vec<Stmt> },
     While { condition: Expr, body: Vec<Stmt> },
     For { name: String, iterable: Expr, body: Vec<Stmt> },
+    Loop { body: Vec<Stmt> },
+    Break,
+    Continue,
 }
 
 #[derive(Debug, Clone, PartialEq)]
