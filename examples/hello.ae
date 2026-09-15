@@ -1,6 +1,9 @@
-fn main() {
-    print("Hello from Aether");
+let name = "Aether";
+let answer = 40 + 2;
+
+fn greet(value) {
+    print("Hello, " + value);
 }
 
-let answer = 40 + 2;
+greet(name);
 print(answer);

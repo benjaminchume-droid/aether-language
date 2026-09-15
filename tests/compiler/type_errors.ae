@@ -1,0 +1,6 @@
+let valid = 1 + 2;
+let invalid = true + 1;
+
+if 42 {
+    print(valid);
+}
