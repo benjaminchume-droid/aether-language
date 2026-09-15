@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::lexer::{Token, TokenKind};
+use crate::types::Type;
 
 pub fn parse(tokens: &[Token]) -> Result<Program, String> { Parser { t: tokens, p: 0 }.program() }
 struct Parser<'a> { t: &'a [Token], p: usize }
@@ -9,9 +10,11 @@ impl<'a> Parser<'a> {
  fn eat(&mut self,k:&TokenKind)->bool { if self.peek()==k{self.p+=1;true}else{false} }
  fn expect(&mut self,k:&TokenKind)->Result<(),String>{if self.eat(k){Ok(())}else{Err(format!("expected {:?}, found {:?}",k,self.peek()))}}
  fn program(mut self)->Result<Program,String>{let mut items=Vec::new();while *self.peek()!=TokenKind::Eof{items.push(self.item()?)}Ok(Program{items})}
- fn item(&mut self)->Result<Item,String>{match self.peek(){TokenKind::Let=>self.let_item().map(|x|match x{Stmt::Let{name,mutable,value}=>Item::Let{name,mutable,value},_=>unreachable!()}),TokenKind::Fn=>self.fn_item(),_=>Ok(Item::Stmt(self.stmt()?))}}
- fn let_item(&mut self)->Result<Stmt,String>{self.bump();let mutable=self.eat(&TokenKind::Mut);let name=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected identifier after let".into())};self.expect(&TokenKind::Eq)?;let value=self.expr()?;self.expect(&TokenKind::Semicolon)?;Ok(Stmt::Let{name,mutable,value})}
- fn fn_item(&mut self)->Result<Item,String>{self.bump();let name=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected function name".into())};self.expect(&TokenKind::LParen)?;let mut params=Vec::new();if !self.eat(&TokenKind::RParen){loop{match self.bump(){TokenKind::Ident(x)=>params.push(x),_=>return Err("expected parameter".into())}if self.eat(&TokenKind::RParen){break}self.expect(&TokenKind::Comma)?}}Ok(Item::Fn{name,params,body:self.block()?})}
+ fn item(&mut self)->Result<Item,String>{match self.peek(){TokenKind::Let=>self.let_item().map(|x|match x{Stmt::Let{name,mutable,annotation,value}=>Item::Let{name,mutable,annotation,value},_=>unreachable!()}),TokenKind::Fn=>self.fn_item(),_=>Ok(Item::Stmt(self.stmt()?))}}
+ fn parse_type(&mut self)->Result<Type,String>{match self.bump(){TokenKind::Ident(name)=>match name.as_str(){"Int"=>Ok(Type::Int),"Float"=>Ok(Type::Float),"Bool"=>Ok(Type::Bool),"String"=>Ok(Type::String),"Unit"=>Ok(Type::Unit),"Array"=>{self.expect(&TokenKind::Lt)?;let inner=self.parse_type()?;self.expect(&TokenKind::Gt)?;Ok(Type::Array(Box::new(inner)))},_=>Err(format!("unknown type `{name}`"))},k=>Err(format!("expected type name, found {:?}",k))}}
+ fn optional_type(&mut self)->Result<Option<Type>,String>{if self.eat(&TokenKind::Colon){Ok(Some(self.parse_type()?))}else{Ok(None)}}
+ fn let_item(&mut self)->Result<Stmt,String>{self.bump();let mutable=self.eat(&TokenKind::Mut);let name=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected identifier after let".into())};let annotation=self.optional_type()?;self.expect(&TokenKind::Eq)?;let value=self.expr()?;self.expect(&TokenKind::Semicolon)?;Ok(Stmt::Let{name,mutable,annotation,value})}
+ fn fn_item(&mut self)->Result<Item,String>{self.bump();let name=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected function name".into())};self.expect(&TokenKind::LParen)?;let mut params=Vec::new();if !self.eat(&TokenKind::RParen){loop{let pname=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected parameter".into())};let pty=self.optional_type()?;params.push(Param{name:pname,ty:pty});if self.eat(&TokenKind::RParen){break}self.expect(&TokenKind::Comma)?}}let return_type=if self.eat(&TokenKind::Arrow){Some(self.parse_type()?)}else{None};Ok(Item::Fn{name,params,return_type,body:self.block()?})}
  fn block(&mut self)->Result<Vec<Stmt>,String>{self.expect(&TokenKind::LBrace)?;let mut v=Vec::new();while !self.eat(&TokenKind::RBrace){if *self.peek()==TokenKind::Eof{return Err("unterminated block".into())}v.push(self.stmt()?)}Ok(v)}
  fn stmt(&mut self)->Result<Stmt,String>{match self.peek(){
   TokenKind::Let=>self.let_item(),
