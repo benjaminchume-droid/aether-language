@@ -5,7 +5,7 @@ pub enum TokenKind {
     Plus, Minus, Star, Slash, Percent,
     Eq, EqEq, Bang, BangEq, Lt, Le, Gt, Ge, AndAnd, OrOr,
     LParen, RParen, LBrace, RBrace, LBracket, RBracket,
-    Comma, Semicolon, Colon, Arrow,
+    Comma, Semicolon, Colon, Dot, Arrow,
     Eof,
 }
 
@@ -17,7 +17,7 @@ pub fn lex(source: &str) -> Result<Vec<Token>, String> {
     while i<chars.len(){let c=chars[i]; if c.is_whitespace(){if c=='\n'{line+=1;col=1}else{col+=1}i+=1;continue} if c=='/'&&chars.get(i+1)==Some(&'/'){while i<chars.len()&&chars[i]!='\n'{i+=1;col+=1}continue}
         let sl=line;let sc=col;let kind=match c{
             '('=>{i+=1;col+=1;TokenKind::LParen},')'=>{i+=1;col+=1;TokenKind::RParen},'{'=>{i+=1;col+=1;TokenKind::LBrace},'}'=>{i+=1;col+=1;TokenKind::RBrace},
-            '['=>{i+=1;col+=1;TokenKind::LBracket},']'=>{i+=1;col+=1;TokenKind::RBracket},','=>{i+=1;col+=1;TokenKind::Comma},';'=>{i+=1;col+=1;TokenKind::Semicolon},':'=>{i+=1;col+=1;TokenKind::Colon},
+            '['=>{i+=1;col+=1;TokenKind::LBracket},']'=>{i+=1;col+=1;TokenKind::RBracket},','=>{i+=1;col+=1;TokenKind::Comma},';'=>{i+=1;col+=1;TokenKind::Semicolon},':'=>{i+=1;col+=1;TokenKind::Colon},'.'=>{i+=1;col+=1;TokenKind::Dot},
             '+'=>{i+=1;col+=1;TokenKind::Plus},'*'=>{i+=1;col+=1;TokenKind::Star},'%'=>{i+=1;col+=1;TokenKind::Percent},
             '-'=>{i+=1;col+=1;if chars.get(i)==Some(&'>'){i+=1;col+=1;TokenKind::Arrow}else{TokenKind::Minus}},
             '/'=>{i+=1;col+=1;TokenKind::Slash},
