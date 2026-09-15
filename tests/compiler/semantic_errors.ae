@@ -1,0 +1,8 @@
+let value = true + 1;
+let missing = unknown_name;
+
+fn single(x) {
+    return x;
+}
+
+single(1, 2);
