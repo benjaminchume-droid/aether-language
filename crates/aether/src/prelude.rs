@@ -1,22 +1,4 @@
-use std::fmt;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value {
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    Str(String),
-    Unit,
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Int(v) => write!(f, "{v}"),
-            Self::Float(v) => write!(f, "{v}"),
-            Self::Bool(v) => write!(f, "{v}"),
-            Self::Str(v) => write!(f, "{v}"),
-            Self::Unit => write!(f, "()"),
-        }
-    }
-}
+use crate::runtime_types::RuntimeValue;
+pub type Value = RuntimeValue;
+pub fn print_value(value:&Value)->String{value.to_string()}
+pub fn truthy(value:&Value)->bool{value.is_truthy()}
