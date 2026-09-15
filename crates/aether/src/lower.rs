@@ -19,11 +19,12 @@ fn stmt(s: &ast::Stmt) -> hir::Stmt {
         ast::Stmt::Let { name, mutable, value } => hir::Stmt::Let { name: name.clone(), mutable: *mutable, value: expr(value) },
         ast::Stmt::Assign { target, value } => hir::Stmt::Assign { target: expr(target), value: expr(value) },
         ast::Stmt::Return(e) => hir::Stmt::Return(e.as_ref().map(expr)),
-        ast::Stmt::If { condition, then_branch, else_branch } => hir::Stmt::If {
-            condition: expr(condition), then_branch: then_branch.iter().map(stmt).collect(), else_branch: else_branch.iter().map(stmt).collect(),
-        },
+        ast::Stmt::If { condition, then_branch, else_branch } => hir::Stmt::If { condition: expr(condition), then_branch: then_branch.iter().map(stmt).collect(), else_branch: else_branch.iter().map(stmt).collect() },
         ast::Stmt::While { condition, body } => hir::Stmt::While { condition: expr(condition), body: body.iter().map(stmt).collect() },
         ast::Stmt::For { name, iterable, body } => hir::Stmt::For { name: name.clone(), iterable: expr(iterable), body: body.iter().map(stmt).collect() },
+        ast::Stmt::Loop { body } => hir::Stmt::Loop { body: body.iter().map(stmt).collect() },
+        ast::Stmt::Break => hir::Stmt::Break,
+        ast::Stmt::Continue => hir::Stmt::Continue,
     }
 }
 
@@ -36,10 +37,7 @@ fn expr(e: &ast::Expr) -> hir::Expr {
         ast::Expr::Array(values) => hir::Expr::Array(values.iter().map(expr).collect()),
         ast::Expr::Ident(v) => hir::Expr::Ident(v.clone()),
         ast::Expr::Index { target, index } => hir::Expr::Index { target: Box::new(expr(target)), index: Box::new(expr(index)) },
-        ast::Expr::Unary { op, expr: inner } => hir::Expr::Unary {
-            op: match op { ast::UnaryOp::Neg => hir::UnaryOp::Neg, ast::UnaryOp::Not => hir::UnaryOp::Not },
-            expr: Box::new(expr(inner)),
-        },
+        ast::Expr::Unary { op, expr: inner } => hir::Expr::Unary { op: match op { ast::UnaryOp::Neg => hir::UnaryOp::Neg, ast::UnaryOp::Not => hir::UnaryOp::Not }, expr: Box::new(expr(inner)) },
         ast::Expr::Binary { left, op, right } => hir::Expr::Binary {
             left: Box::new(expr(left)),
             op: match op {
