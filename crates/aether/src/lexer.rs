@@ -4,8 +4,9 @@ pub enum TokenKind {
     Let, Mut, Fn, If, Else, While, Return, True, False,
     Plus, Minus, Star, Slash, Percent,
     Eq, EqEq, Bang, BangEq, Lt, Le, Gt, Ge, AndAnd, OrOr,
-    LParen, RParen, LBrace, RBrace, Comma, Semicolon,
-    Arrow, Eof,
+    LParen, RParen, LBrace, RBrace, LBracket, RBracket,
+    Comma, Semicolon, Arrow,
+    Eof,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,6 +23,7 @@ pub fn lex(source: &str) -> Result<Vec<Token>, String> {
         let kind = match c {
             '(' => { i += 1; col += 1; TokenKind::LParen }, ')' => { i += 1; col += 1; TokenKind::RParen },
             '{' => { i += 1; col += 1; TokenKind::LBrace }, '}' => { i += 1; col += 1; TokenKind::RBrace },
+            '[' => { i += 1; col += 1; TokenKind::LBracket }, ']' => { i += 1; col += 1; TokenKind::RBracket },
             ',' => { i += 1; col += 1; TokenKind::Comma }, ';' => { i += 1; col += 1; TokenKind::Semicolon },
             '+' => { i += 1; col += 1; TokenKind::Plus }, '*' => { i += 1; col += 1; TokenKind::Star },
             '%' => { i += 1; col += 1; TokenKind::Percent },
