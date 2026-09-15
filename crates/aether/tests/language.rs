@@ -16,6 +16,11 @@ use aether::{compiler::compile, lexer, parser, run};
 #[test] fn payload_enums_and_pattern_bindings(){assert_eq!(run("enum Message { Quit, Text(String), Count(Int) } let m: Message = Message::Text(\"hello\"); match m { Message::Quit => { print(\"quit\"); }, Message::Text(text) => { print(text); }, Message::Count(n) => { print(n); } }").unwrap(),"hello");}
 #[test] fn rejects_bad_enum_payload(){assert!(compile("enum Message { Text(String) } let m = Message::Text(42);").is_err());}
 #[test] fn rejects_bad_pattern_binding_count(){assert!(compile("enum Message { Text(String) } let m = Message::Text(\"x\"); match m { Message::Text(a, b) => { print(a); }, }").is_err());}
+#[test] fn tuple_executes(){assert_eq!(run("let t: Tuple<Int, String> = (42, \"answer\"); print(t[0], t[1]);").unwrap(),"42 answer");}
+#[test] fn nested_tuple_executes(){assert_eq!(run("let t: Tuple<Int, Tuple<String, Bool>> = (7, (\"ok\", true)); print(t[0], t[1][0], t[1][1]);").unwrap(),"7 ok true");}
+#[test] fn tuple_mutation_executes(){assert_eq!(run("let mut t: Tuple<Int, Int> = (1, 2); t[0] = 9; print(t[0], t[1]);").unwrap(),"9 2");}
+#[test] fn rejects_wrong_tuple_shape(){assert!(compile("let t: Tuple<Int, String> = (1, 2);").is_err());}
+#[test] fn rejects_tuple_out_of_bounds(){assert!(compile("let t = (1, 2); print(t[2]);").is_err());}
 #[test] fn collections_and_mutation(){assert_eq!(run("let mut xs: Array<Int> = [1, 2, 3]; xs[1] = 9; for x in xs { print(x); }").unwrap(),"1\n9\n3");}
 #[test] fn loop_break_and_continue(){assert_eq!(run("let mut x: Int = 0; loop { x = x + 1; if x == 2 { continue; } if x == 4 { break; } print(x); }").unwrap(),"1\n3");}
 #[test] fn rejects_break_outside_loop(){assert!(run("break;").is_err());}
