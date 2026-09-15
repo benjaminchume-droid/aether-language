@@ -2,171 +2,22 @@ use crate::ast::*;
 use crate::lexer::{Token, TokenKind};
 
 pub fn parse(tokens: &[Token]) -> Result<Program, String> { Parser { t: tokens, p: 0 }.program() }
-
 struct Parser<'a> { t: &'a [Token], p: usize }
-
 impl<'a> Parser<'a> {
-    fn peek(&self) -> &TokenKind { &self.t[self.p].kind }
-    fn bump(&mut self) -> TokenKind { let k = self.t[self.p].kind.clone(); self.p += 1; k }
-    fn eat(&mut self, k: &TokenKind) -> bool { if self.peek() == k { self.p += 1; true } else { false } }
-    fn expect(&mut self, k: &TokenKind) -> Result<(), String> { if self.eat(k) { Ok(()) } else { Err(format!("expected {:?}, found {:?}", k, self.peek())) } }
-
-    fn program(mut self) -> Result<Program, String> {
-        let mut items = Vec::new();
-        while *self.peek() != TokenKind::Eof { items.push(self.item()?); }
-        Ok(Program { items })
-    }
-
-    fn item(&mut self) -> Result<Item, String> {
-        match self.peek() {
-            TokenKind::Let => self.let_item().map(|x| match x { Stmt::Let { name, mutable, value } => Item::Let { name, mutable, value }, _ => unreachable!() }),
-            TokenKind::Fn => self.fn_item(),
-            _ => Ok(Item::Stmt(self.stmt()?)),
-        }
-    }
-
-    fn let_item(&mut self) -> Result<Stmt, String> {
-        self.bump();
-        let mutable = self.eat(&TokenKind::Mut);
-        let name = match self.bump() { TokenKind::Ident(x) => x, _ => return Err("expected identifier after let".into()) };
-        self.expect(&TokenKind::Eq)?;
-        let value = self.expr()?;
-        self.expect(&TokenKind::Semicolon)?;
-        Ok(Stmt::Let { name, mutable, value })
-    }
-
-    fn fn_item(&mut self) -> Result<Item, String> {
-        self.bump();
-        let name = match self.bump() { TokenKind::Ident(x) => x, _ => return Err("expected function name".into()) };
-        self.expect(&TokenKind::LParen)?;
-        let mut params = Vec::new();
-        if !self.eat(&TokenKind::RParen) {
-            loop {
-                match self.bump() { TokenKind::Ident(x) => params.push(x), _ => return Err("expected parameter".into()) }
-                if self.eat(&TokenKind::RParen) { break; }
-                self.expect(&TokenKind::Comma)?;
-            }
-        }
-        let body = self.block()?;
-        Ok(Item::Fn { name, params, body })
-    }
-
-    fn block(&mut self) -> Result<Vec<Stmt>, String> {
-        self.expect(&TokenKind::LBrace)?;
-        let mut v = Vec::new();
-        while !self.eat(&TokenKind::RBrace) {
-            if *self.peek() == TokenKind::Eof { return Err("unterminated block".into()); }
-            v.push(self.stmt()?);
-        }
-        Ok(v)
-    }
-
-    fn stmt(&mut self) -> Result<Stmt, String> {
-        match self.peek() {
-            TokenKind::Let => self.let_item(),
-            TokenKind::Return => {
-                self.bump();
-                let e = if self.eat(&TokenKind::Semicolon) { None } else { let x = self.expr()?; self.expect(&TokenKind::Semicolon)?; Some(x) };
-                Ok(Stmt::Return(e))
-            }
-            TokenKind::If => {
-                self.bump();
-                let c = self.expr()?;
-                let a = self.block()?;
-                let b = if self.eat(&TokenKind::Else) { self.block()? } else { Vec::new() };
-                Ok(Stmt::If { condition: c, then_branch: a, else_branch: b })
-            }
-            TokenKind::While => {
-                self.bump();
-                let c = self.expr()?;
-                let b = self.block()?;
-                Ok(Stmt::While { condition: c, body: b })
-            }
-            _ => {
-                let target = self.expr()?;
-                if self.eat(&TokenKind::Eq) {
-                    let value = self.expr()?;
-                    self.expect(&TokenKind::Semicolon)?;
-                    Ok(Stmt::Assign { target, value })
-                } else {
-                    self.expect(&TokenKind::Semicolon)?;
-                    Ok(Stmt::Expr(target))
-                }
-            }
-        }
-    }
-
-    fn expr(&mut self) -> Result<Expr, String> { self.binary(0) }
-
-    fn prec(k: &TokenKind) -> Option<u8> {
-        Some(match k {
-            TokenKind::OrOr => 1, TokenKind::AndAnd => 2,
-            TokenKind::EqEq | TokenKind::BangEq => 3,
-            TokenKind::Lt | TokenKind::Le | TokenKind::Gt | TokenKind::Ge => 4,
-            TokenKind::Plus | TokenKind::Minus => 5,
-            TokenKind::Star | TokenKind::Slash | TokenKind::Percent => 6,
-            _ => return None,
-        })
-    }
-
-    fn binary(&mut self, min: u8) -> Result<Expr, String> {
-        let mut left = self.unary()?;
-        loop {
-            let Some(p) = Self::prec(self.peek()) else { break };
-            if p < min { break }
-            let op = match self.bump() {
-                TokenKind::Plus => BinaryOp::Add, TokenKind::Minus => BinaryOp::Sub, TokenKind::Star => BinaryOp::Mul,
-                TokenKind::Slash => BinaryOp::Div, TokenKind::Percent => BinaryOp::Mod, TokenKind::EqEq => BinaryOp::Eq,
-                TokenKind::BangEq => BinaryOp::Ne, TokenKind::Lt => BinaryOp::Lt, TokenKind::Le => BinaryOp::Le,
-                TokenKind::Gt => BinaryOp::Gt, TokenKind::Ge => BinaryOp::Ge, TokenKind::AndAnd => BinaryOp::And,
-                TokenKind::OrOr => BinaryOp::Or, _ => unreachable!()
-            };
-            let right = self.binary(p + 1)?;
-            left = Expr::Binary { left: Box::new(left), op, right: Box::new(right) };
-        }
-        Ok(left)
-    }
-
-    fn unary(&mut self) -> Result<Expr, String> {
-        match self.peek() {
-            TokenKind::Minus => { self.bump(); Ok(Expr::Unary { op: UnaryOp::Neg, expr: Box::new(self.unary()?) }) }
-            TokenKind::Bang => { self.bump(); Ok(Expr::Unary { op: UnaryOp::Not, expr: Box::new(self.unary()?) }) }
-            _ => self.postfix(),
-        }
-    }
-
-    fn postfix(&mut self) -> Result<Expr, String> {
-        let mut e = self.primary()?;
-        loop {
-            if self.eat(&TokenKind::LParen) {
-                let mut args = Vec::new();
-                if !self.eat(&TokenKind::RParen) {
-                    loop { args.push(self.expr()?); if self.eat(&TokenKind::RParen) { break; } self.expect(&TokenKind::Comma)?; }
-                }
-                e = Expr::Call { callee: Box::new(e), args };
-            } else if self.eat(&TokenKind::LBracket) {
-                let index = self.expr()?;
-                self.expect(&TokenKind::RBracket)?;
-                e = Expr::Index { target: Box::new(e), index: Box::new(index) };
-            } else { break; }
-        }
-        Ok(e)
-    }
-
-    fn primary(&mut self) -> Result<Expr, String> {
-        match self.bump() {
-            TokenKind::Int(x) => Ok(Expr::Int(x)), TokenKind::Float(x) => Ok(Expr::Float(x)),
-            TokenKind::Bool(x) => Ok(Expr::Bool(x)), TokenKind::True => Ok(Expr::Bool(true)), TokenKind::False => Ok(Expr::Bool(false)),
-            TokenKind::Str(x) => Ok(Expr::Str(x)), TokenKind::Ident(x) => Ok(Expr::Ident(x)),
-            TokenKind::LBracket => {
-                let mut values = Vec::new();
-                if !self.eat(&TokenKind::RBracket) {
-                    loop { values.push(self.expr()?); if self.eat(&TokenKind::RBracket) { break; } self.expect(&TokenKind::Comma)?; }
-                }
-                Ok(Expr::Array(values))
-            }
-            TokenKind::LParen => { let x = self.expr()?; self.expect(&TokenKind::RParen)?; Ok(x) }
-            k => Err(format!("unexpected token {:?}", k)),
-        }
-    }
+ fn peek(&self)->&TokenKind { &self.t[self.p].kind }
+ fn bump(&mut self)->TokenKind { let k=self.t[self.p].kind.clone(); self.p+=1;k }
+ fn eat(&mut self,k:&TokenKind)->bool { if self.peek()==k{self.p+=1;true}else{false} }
+ fn expect(&mut self,k:&TokenKind)->Result<(),String>{if self.eat(k){Ok(())}else{Err(format!("expected {:?}, found {:?}",k,self.peek()))}}
+ fn program(mut self)->Result<Program,String>{let mut items=Vec::new();while *self.peek()!=TokenKind::Eof{items.push(self.item()?)}Ok(Program{items})}
+ fn item(&mut self)->Result<Item,String>{match self.peek(){TokenKind::Let=>self.let_item().map(|x|match x{Stmt::Let{name,mutable,value}=>Item::Let{name,mutable,value},_=>unreachable!()}),TokenKind::Fn=>self.fn_item(),_=>Ok(Item::Stmt(self.stmt()?))}}
+ fn let_item(&mut self)->Result<Stmt,String>{self.bump();let mutable=self.eat(&TokenKind::Mut);let name=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected identifier after let".into())};self.expect(&TokenKind::Eq)?;let value=self.expr()?;self.expect(&TokenKind::Semicolon)?;Ok(Stmt::Let{name,mutable,value})}
+ fn fn_item(&mut self)->Result<Item,String>{self.bump();let name=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected function name".into())};self.expect(&TokenKind::LParen)?;let mut params=Vec::new();if !self.eat(&TokenKind::RParen){loop{match self.bump(){TokenKind::Ident(x)=>params.push(x),_=>return Err("expected parameter".into())}if self.eat(&TokenKind::RParen){break}self.expect(&TokenKind::Comma)?}}Ok(Item::Fn{name,params,body:self.block()?})}
+ fn block(&mut self)->Result<Vec<Stmt>,String>{self.expect(&TokenKind::LBrace)?;let mut v=Vec::new();while !self.eat(&TokenKind::RBrace){if *self.peek()==TokenKind::Eof{return Err("unterminated block".into())}v.push(self.stmt()?)}Ok(v)}
+ fn stmt(&mut self)->Result<Stmt,String>{match self.peek(){TokenKind::Let=>self.let_item(),TokenKind::Return=>{self.bump();let e=if self.eat(&TokenKind::Semicolon){None}else{let x=self.expr()?;self.expect(&TokenKind::Semicolon)?;Some(x)};Ok(Stmt::Return(e))},TokenKind::If=>{self.bump();let c=self.expr()?;let a=self.block()?;let b=if self.eat(&TokenKind::Else){self.block()?}else{Vec::new()};Ok(Stmt::If{condition:c,then_branch:a,else_branch:b})},TokenKind::While=>{self.bump();let c=self.expr()?;Ok(Stmt::While{condition:c,body:self.block()?})},TokenKind::For=>{self.bump();let name=match self.bump(){TokenKind::Ident(x)=>x,_=>return Err("expected loop variable after for".into())};self.expect(&TokenKind::In)?;let iterable=self.expr()?;let body=self.block()?;Ok(Stmt::For{name,iterable,body})},_=>{let target=self.expr()?;if self.eat(&TokenKind::Eq){let value=self.expr()?;self.expect(&TokenKind::Semicolon)?;Ok(Stmt::Assign{target,value})}else{self.expect(&TokenKind::Semicolon)?;Ok(Stmt::Expr(target))}}}}
+ fn expr(&mut self)->Result<Expr,String>{self.binary(0)}
+ fn prec(k:&TokenKind)->Option<u8>{Some(match k{TokenKind::OrOr=>1,TokenKind::AndAnd=>2,TokenKind::EqEq|TokenKind::BangEq=>3,TokenKind::Lt|TokenKind::Le|TokenKind::Gt|TokenKind::Ge=>4,TokenKind::Plus|TokenKind::Minus=>5,TokenKind::Star|TokenKind::Slash|TokenKind::Percent=>6,_=>return None})}
+ fn binary(&mut self,min:u8)->Result<Expr,String>{let mut left=self.unary()?;loop{let Some(p)=Self::prec(self.peek())else{break};if p<min{break}let op=match self.bump(){TokenKind::Plus=>BinaryOp::Add,TokenKind::Minus=>BinaryOp::Sub,TokenKind::Star=>BinaryOp::Mul,TokenKind::Slash=>BinaryOp::Div,TokenKind::Percent=>BinaryOp::Mod,TokenKind::EqEq=>BinaryOp::Eq,TokenKind::BangEq=>BinaryOp::Ne,TokenKind::Lt=>BinaryOp::Lt,TokenKind::Le=>BinaryOp::Le,TokenKind::Gt=>BinaryOp::Gt,TokenKind::Ge=>BinaryOp::Ge,TokenKind::AndAnd=>BinaryOp::And,TokenKind::OrOr=>BinaryOp::Or,_=>unreachable!()};let right=self.binary(p+1)?;left=Expr::Binary{left:Box::new(left),op,right:Box::new(right)}}Ok(left)}
+ fn unary(&mut self)->Result<Expr,String>{match self.peek(){TokenKind::Minus=>{self.bump();Ok(Expr::Unary{op:UnaryOp::Neg,expr:Box::new(self.unary()?)})},TokenKind::Bang=>{self.bump();Ok(Expr::Unary{op:UnaryOp::Not,expr:Box::new(self.unary()?)})},_=>self.postfix()}}
+ fn postfix(&mut self)->Result<Expr,String>{let mut e=self.primary()?;loop{if self.eat(&TokenKind::LParen){let mut args=Vec::new();if !self.eat(&TokenKind::RParen){loop{args.push(self.expr()?);if self.eat(&TokenKind::RParen){break}self.expect(&TokenKind::Comma)?}}e=Expr::Call{callee:Box::new(e),args}}else if self.eat(&TokenKind::LBracket){let index=self.expr()?;self.expect(&TokenKind::RBracket)?;e=Expr::Index{target:Box::new(e),index:Box::new(index)}}else{break}}Ok(e)}
+ fn primary(&mut self)->Result<Expr,String>{match self.bump(){TokenKind::Int(x)=>Ok(Expr::Int(x)),TokenKind::Float(x)=>Ok(Expr::Float(x)),TokenKind::Bool(x)=>Ok(Expr::Bool(x)),TokenKind::True=>Ok(Expr::Bool(true)),TokenKind::False=>Ok(Expr::Bool(false)),TokenKind::Str(x)=>Ok(Expr::Str(x)),TokenKind::Ident(x)=>Ok(Expr::Ident(x)),TokenKind::LBracket=>{let mut values=Vec::new();if !self.eat(&TokenKind::RBracket){loop{values.push(self.expr()?);if self.eat(&TokenKind::RBracket){break}self.expect(&TokenKind::Comma)?}}Ok(Expr::Array(values))},TokenKind::LParen=>{let x=self.expr()?;self.expect(&TokenKind::RParen)?;Ok(x)},k=>Err(format!("unexpected token {:?}",k))}}
 }
