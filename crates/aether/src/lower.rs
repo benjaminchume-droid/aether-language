@@ -7,8 +7,15 @@ pub fn lower(program: &ast::Program) -> hir::Program {
 
 fn item(i: &ast::Item) -> hir::Item {
     match i {
-        ast::Item::Let { name, mutable, value } => hir::Item::Let { name: name.clone(), mutable: *mutable, value: expr(value) },
-        ast::Item::Fn { name, params, body } => hir::Item::Fn { name: name.clone(), params: params.clone(), body: body.iter().map(stmt).collect() },
+        ast::Item::Let { name, mutable, annotation, value } => hir::Item::Let {
+            name: name.clone(), mutable: *mutable, annotation: annotation.clone(), value: expr(value)
+        },
+        ast::Item::Fn { name, params, return_type, body } => hir::Item::Fn {
+            name: name.clone(),
+            params: params.iter().map(|p| hir::Param { name: p.name.clone(), ty: p.ty.clone() }).collect(),
+            return_type: return_type.clone(),
+            body: body.iter().map(stmt).collect()
+        },
         ast::Item::Stmt(s) => hir::Item::Stmt(stmt(s)),
     }
 }
@@ -16,10 +23,14 @@ fn item(i: &ast::Item) -> hir::Item {
 fn stmt(s: &ast::Stmt) -> hir::Stmt {
     match s {
         ast::Stmt::Expr(e) => hir::Stmt::Expr(expr(e)),
-        ast::Stmt::Let { name, mutable, value } => hir::Stmt::Let { name: name.clone(), mutable: *mutable, value: expr(value) },
+        ast::Stmt::Let { name, mutable, annotation, value } => hir::Stmt::Let {
+            name: name.clone(), mutable: *mutable, annotation: annotation.clone(), value: expr(value)
+        },
         ast::Stmt::Assign { target, value } => hir::Stmt::Assign { target: expr(target), value: expr(value) },
         ast::Stmt::Return(e) => hir::Stmt::Return(e.as_ref().map(expr)),
-        ast::Stmt::If { condition, then_branch, else_branch } => hir::Stmt::If { condition: expr(condition), then_branch: then_branch.iter().map(stmt).collect(), else_branch: else_branch.iter().map(stmt).collect() },
+        ast::Stmt::If { condition, then_branch, else_branch } => hir::Stmt::If {
+            condition: expr(condition), then_branch: then_branch.iter().map(stmt).collect(), else_branch: else_branch.iter().map(stmt).collect()
+        },
         ast::Stmt::While { condition, body } => hir::Stmt::While { condition: expr(condition), body: body.iter().map(stmt).collect() },
         ast::Stmt::For { name, iterable, body } => hir::Stmt::For { name: name.clone(), iterable: expr(iterable), body: body.iter().map(stmt).collect() },
         ast::Stmt::Loop { body } => hir::Stmt::Loop { body: body.iter().map(stmt).collect() },
@@ -37,7 +48,9 @@ fn expr(e: &ast::Expr) -> hir::Expr {
         ast::Expr::Array(values) => hir::Expr::Array(values.iter().map(expr).collect()),
         ast::Expr::Ident(v) => hir::Expr::Ident(v.clone()),
         ast::Expr::Index { target, index } => hir::Expr::Index { target: Box::new(expr(target)), index: Box::new(expr(index)) },
-        ast::Expr::Unary { op, expr: inner } => hir::Expr::Unary { op: match op { ast::UnaryOp::Neg => hir::UnaryOp::Neg, ast::UnaryOp::Not => hir::UnaryOp::Not }, expr: Box::new(expr(inner)) },
+        ast::Expr::Unary { op, expr: inner } => hir::Expr::Unary {
+            op: match op { ast::UnaryOp::Neg => hir::UnaryOp::Neg, ast::UnaryOp::Not => hir::UnaryOp::Not }, expr: Box::new(expr(inner))
+        },
         ast::Expr::Binary { left, op, right } => hir::Expr::Binary {
             left: Box::new(expr(left)),
             op: match op {
@@ -49,7 +62,7 @@ fn expr(e: &ast::Expr) -> hir::Expr {
                 ast::BinaryOp::Ge => hir::BinaryOp::Ge, ast::BinaryOp::And => hir::BinaryOp::And,
                 ast::BinaryOp::Or => hir::BinaryOp::Or,
             },
-            right: Box::new(expr(right)),
+            right: Box::new(expr(right))
         },
         ast::Expr::Call { callee, args } => hir::Expr::Call { callee: Box::new(expr(callee)), args: args.iter().map(expr).collect() },
     }
