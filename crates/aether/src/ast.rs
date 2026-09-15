@@ -3,7 +3,7 @@ use crate::types::Type;
 #[derive(Debug,Clone,PartialEq)] pub struct Param{pub name:String,pub ty:Option<Type>}
 #[derive(Debug,Clone,PartialEq)] pub struct Field{pub name:String,pub ty:Type}
 #[derive(Debug,Clone,PartialEq)] pub struct EnumVariant{pub name:String,pub payload:Vec<Type>}
-#[derive(Debug,Clone,PartialEq)] pub enum Item{Let{name:String,mutable:bool,annotation:Option<Type>,value:Expr},Fn{name:String,params:Vec<Param>,return_type:Option<Type>,body:Vec<Stmt>},Struct{name:String,fields:Vec<Field>},Enum{name:String,variants:Vec<EnumVariant>},Stmt(Stmt)}
+#[derive(Debug,Clone,PartialEq)] pub enum Item{Import(String),Let{name:String,mutable:bool,annotation:Option<Type>,value:Expr},Fn{name:String,params:Vec<Param>,return_type:Option<Type>,body:Vec<Stmt>},Struct{name:String,fields:Vec<Field>},Enum{name:String,variants:Vec<EnumVariant>},Stmt(Stmt)}
 #[derive(Debug,Clone,PartialEq)] pub struct MatchArm{pub pattern:Pattern,pub body:Vec<Stmt>}
 #[derive(Debug,Clone,PartialEq)] pub enum Pattern{Wildcard,Enum{enum_name:String,variant:String,bindings:Vec<String>}}
 #[derive(Debug,Clone,PartialEq)] pub enum Stmt{Expr(Expr),Let{name:String,mutable:bool,annotation:Option<Type>,value:Expr},Assign{target:Expr,value:Expr},Return(Option<Expr>),If{condition:Expr,then_branch:Vec<Stmt>,else_branch:Vec<Stmt>},While{condition:Expr,body:Vec<Stmt>},For{name:String,iterable:Expr,body:Vec<Stmt>},Loop{body:Vec<Stmt>},Match{value:Expr,arms:Vec<MatchArm>},Break,Continue}
