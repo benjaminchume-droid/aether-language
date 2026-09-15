@@ -1,0 +1,8 @@
+let base = 10;
+let result = base * 2 + 5;
+
+fn twice(value) {
+    return value * 2;
+}
+
+twice(result);
