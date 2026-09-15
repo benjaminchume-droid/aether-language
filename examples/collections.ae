@@ -1,0 +1,13 @@
+fn sum(values) {
+    let mut total = 0;
+    let mut i = 0;
+    while i < 3 {
+        total = total + values[i];
+        i = i + 1;
+    }
+    return total;
+}
+
+let numbers = [4, 8, 15];
+print(numbers);
+print(sum(numbers));
