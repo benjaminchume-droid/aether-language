@@ -7,17 +7,19 @@ pub struct Param { pub name: String, pub ty: Option<Type> }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Field { pub name: String, pub ty: Type }
 #[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant { pub name: String, pub payload: Vec<Type> }
+#[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Let { name: String, mutable: bool, annotation: Option<Type>, value: Expr },
     Fn { name: String, params: Vec<Param>, return_type: Option<Type>, body: Vec<Stmt> },
     Struct { name: String, fields: Vec<Field> },
-    Enum { name: String, variants: Vec<String> },
+    Enum { name: String, variants: Vec<EnumVariant> },
     Stmt(Stmt),
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchArm { pub pattern: Pattern, pub body: Vec<Stmt> }
 #[derive(Debug, Clone, PartialEq)]
-pub enum Pattern { Wildcard, Enum { enum_name: String, variant: String } }
+pub enum Pattern { Wildcard, Enum { enum_name: String, variant: String, bindings: Vec<String> } }
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expr(Expr), Let { name: String, mutable: bool, annotation: Option<Type>, value: Expr },
@@ -30,7 +32,7 @@ pub enum Stmt {
 pub enum Expr {
     Int(i64), Float(f64), Bool(bool), Str(String), Array(Vec<Expr>), Ident(String),
     StructInit { name: String, fields: Vec<(String, Expr)> }, Member { target: Box<Expr>, field: String },
-    EnumValue { enum_name: String, variant: String }, Index { target: Box<Expr>, index: Box<Expr> },
+    EnumValue { enum_name: String, variant: String, payload: Vec<Expr> }, Index { target: Box<Expr>, index: Box<Expr> },
     Unary { op: UnaryOp, expr: Box<Expr> }, Binary { left: Box<Expr>, op: BinaryOp, right: Box<Expr> },
     Call { callee: Box<Expr>, args: Vec<Expr> },
 }
