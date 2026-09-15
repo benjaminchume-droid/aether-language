@@ -4,7 +4,7 @@ mod tests {
 
     #[test]
     fn accepts_valid_program() {
-        let src = "let answer = 40 + 2; if answer == 42 { print(answer); }";
+        let src = "let answer: Int = 40 + 2; if answer == 42 { print(answer); }";
         assert!(compile(src).is_ok());
     }
 
@@ -27,5 +27,18 @@ mod tests {
         let src = "fn one(x) { return x; } one(1, 2);";
         let errors = compile(src).expect_err("call arity should be rejected");
         assert!(errors.iter().any(|e| e.contains("expects 1 arguments")));
+    }
+
+    #[test]
+    fn accepts_structs_and_member_access() {
+        let src = "struct User { name: String, age: Int } let user: User = User { name: \"Ada\", age: 36 }; print(user.age);";
+        assert!(compile(src).is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_struct_field() {
+        let src = "struct User { age: Int } let user = User { age: 36 }; print(user.name);";
+        let errors = compile(src).expect_err("unknown field should be rejected");
+        assert!(errors.iter().any(|e| e.contains("has no field `name`")));
     }
 }
