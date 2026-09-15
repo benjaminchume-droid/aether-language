@@ -1,17 +1,22 @@
+use crate::types::Type;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program { pub items: Vec<Item> }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Param { pub name: String, pub ty: Option<Type> }
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Item {
-    Let { name: String, mutable: bool, value: Expr },
-    Fn { name: String, params: Vec<String>, body: Vec<Stmt> },
+    Let { name: String, mutable: bool, annotation: Option<Type>, value: Expr },
+    Fn { name: String, params: Vec<Param>, return_type: Option<Type>, body: Vec<Stmt> },
     Stmt(Stmt),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Expr(Expr),
-    Let { name: String, mutable: bool, value: Expr },
+    Let { name: String, mutable: bool, annotation: Option<Type>, value: Expr },
     Assign { target: Expr, value: Expr },
     Return(Option<Expr>),
     If { condition: Expr, then_branch: Vec<Stmt>, else_branch: Vec<Stmt> },
