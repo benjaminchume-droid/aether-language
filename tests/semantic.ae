@@ -1,0 +1,10 @@
+let answer = 40 + 2;
+let text = "hello" + " aether";
+
+fn add(a, b) {
+    return a + b;
+}
+
+if answer == 42 {
+    print(text);
+}
