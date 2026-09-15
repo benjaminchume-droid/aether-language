@@ -7,9 +7,13 @@ pub struct Program { pub items: Vec<Item> }
 pub struct Param { pub name: String, pub ty: Option<Type> }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Field { pub name: String, pub ty: Type }
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Item {
     Let { name: String, mutable: bool, annotation: Option<Type>, value: Expr },
     Fn { name: String, params: Vec<Param>, return_type: Option<Type>, body: Vec<Stmt> },
+    Struct { name: String, fields: Vec<Field> },
     Stmt(Stmt),
 }
 
@@ -30,6 +34,8 @@ pub enum Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Int(i64), Float(f64), Bool(bool), Str(String), Array(Vec<Expr>), Ident(String),
+    StructInit { name: String, fields: Vec<(String, Expr)> },
+    Member { target: Box<Expr>, field: String },
     Index { target: Box<Expr>, index: Box<Expr> },
     Unary { op: UnaryOp, expr: Box<Expr> },
     Binary { left: Box<Expr>, op: BinaryOp, right: Box<Expr> },
