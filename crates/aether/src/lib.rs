@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod compiler;
 pub mod diagnostics;
+pub mod driver;
 pub mod hir;
 pub mod interpreter;
 pub mod lexer;

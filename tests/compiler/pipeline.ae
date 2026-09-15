@@ -1,0 +1,6 @@
+let x = 2 * (3 + 4);
+let y = x == 14;
+
+if y {
+    print("pipeline ok");
+}
