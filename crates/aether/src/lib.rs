@@ -8,6 +8,8 @@ pub mod lexer;
 pub mod lower;
 pub mod parser;
 pub mod prelude;
+pub mod runtime_types;
 pub mod semantic;
+pub mod type_system;
 pub mod typecheck;
 pub mod types;
